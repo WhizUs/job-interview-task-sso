@@ -22,3 +22,4 @@ In this task we'll briefly look into the SSO topic.
   * [Keycloak](https://www.keycloak.org/)
   * [MariaDB](https://mariadb.org/)
   * [docker](https://www.docker.com/)
+  * [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/)
