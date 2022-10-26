@@ -1,0 +1,18 @@
+LE_EMAIL=bob@example.com
+DOMAIN=example.com
+
+# Keycloak
+DB_VENDOR=mariadb
+DB_USER=someuser
+DB_DATABASE=keycloak
+DB_PASSWORD=very-secure-password
+DB_ADDR=mariadb
+DB_PORT=3306
+KEYCLOAK_USER=someadmin
+KEYCLOAK_PASSWORD=very-secure-password
+
+# MariaDB
+MYSQL_ROOT_PASSWORD=my-root-password
+MYSQL_DATABASE=keycloak
+MYSQL_USER=someuser
+MYSQL_PASSWORD=very-secure-password

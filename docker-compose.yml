@@ -1,0 +1,112 @@
+version: "3.3"
+
+services:
+
+  traefik:
+    image: "traefik:v2.9"
+    restart: unless-stopped
+    container_name: "traefik"
+    command:
+      - "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      #- "--certificatesresolvers.letsencrypt.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.letsencrypt.acme.email=${LE_EMAIL?err}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    networks:
+      - proxy
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN?err}`)
+      - traefik.http.routers.traefik.entrypoints=websecure
+      - traefik.http.routers.traefik.service=api@internal
+      - traefik.http.routers.traefik.tls=true
+      - traefik.http.routers.traefik.tls.certresolver=letsencrypt
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:19.0.3-legacy
+    restart: unless-stopped
+    command: -b 0.0.0.0 -bmanagement 0.0.0.0
+    environment:
+      - PROXY_ADDRESS_FORWARDING=true
+      - DB_VENDOR=${DB_VENDOR?err}
+      - DB_USER=${DB_USER?err}
+      - DB_DATABASE=${DB_DATABASE?err}
+      - DB_PASSWORD=${DB_PASSWORD?err}
+      - DB_ADDR=${DB_ADDR?err}
+      - DB_PORT=${DB_PORT?err}
+      - KEYCLOAK_USER=${KEYCLOAK_USER?err}
+      - KEYCLOAK_PASSWORD=${KEYCLOAK_PASSWORD?err}
+    networks:
+      - intern
+      - proxy
+    depends_on:
+      - mariadb
+    ports:
+      - 9990
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.keycloak.rule=Host(`auth.${DOMAIN?err}`)
+      - traefik.http.services.keycloak.loadbalancer.server.port=8080
+      - traefik.http.routers.keycloak.entrypoints=websecure
+      - traefik.http.routers.keycloak.tls=true
+      - traefik.http.routers.keycloak.tls.certresolver=letsencrypt
+
+  mariadb:
+    image: mariadb:10.6.4
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD?err}
+      - MYSQL_DATABASE=${MYSQL_DATABASE?err}
+      - MYSQL_USER=${MYSQL_USER?err}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD?err}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "--silent"]
+    ports:
+      - 3306
+    volumes:
+      - mariadb:/data/db
+    networks:
+      - intern
+
+  app:
+    image: nginx
+    restart: unless-stopped
+    networks:
+      - proxy
+      - intern
+    depends_on:
+      - mariadb
+  
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.app.rule=Host(`app.${DOMAIN?err}`)
+      - traefik.http.services.app.loadbalancer.server.port=80
+      - traefik.http.routers.app.entrypoints=websecure
+      - traefik.http.routers.app.tls=true
+      - traefik.http.routers.app.tls.certresolver=letsencrypt
+
+volumes:
+  mariadb:
+    
+networks:
+  intern:
+  proxy:
+    external: true
